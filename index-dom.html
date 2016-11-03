@@ -1,0 +1,77 @@
+<html>
+  <head>
+    <link href="/css/materialize.css" rel='stylesheet' type='text/css' />
+  </head>
+  <body>
+    <div id="app" class="container">
+        <characters offset=140 limit=2></characters>
+    </div>
+
+    <characters offset=140 limit=1></characters>
+    <characters offset=140 limit=100></characters>
+    
+    <script data-item="vuejs" src="/js/vue.js"></script>
+    <script data-item="vuejs-plugin-resource" src="/js/vue-resource.js"></script>
+    <script data-item="main">
+        var Rebolon = {
+            Marvel: {
+                apiKey: "a6954f9360f90696e0a9a52bc88ac5ac"
+	    }
+	};
+    </script>
+    <script type="x/template" id="characters-tpl">
+        <ul>
+            <li v-for="character in characters">
+	      <div class="chip">
+	        <img v-bind:src="character.thumbnail.path + '.' + character.thumbnail.extension" v-bind:alt="character.name">
+		{{character.name}}
+	      </div>
+	</ul>
+    </script>
+    <script data-item="vuejs-component-characters">
+        Vue.component('characters', {
+            template: '#characters-tpl',
+            props: [
+                'offset',
+                'limit'
+            ],
+            data: function () {
+                return {
+                    characters: []
+                };
+            },
+            beforeCreate: function () {
+                
+            },
+            created: function() {
+                const params = {
+                    apikey: Rebolon.Marvel.apiKey,
+                    offset: this.offset ? parseInt(this.offset) : 0,
+                    limit: this.limit ? parseInt(this.limit) : 10,
+                };
+                console.log(params);
+                this.$http
+                .get("https://gateway.marvel.com:443/v1/public/characters", {params: params})
+                .then(response => {
+                    try {
+                        var characters = response.body.data.results;
+                        characters.forEach(item => {
+                            //console.log(this, item);
+                            this.characters.push(item);
+                        });
+                    } catch (e) {
+                        console.error('unexpected data', response);
+                    }
+                }, response => {
+                        console.warn('http error', response);
+                   }
+                );
+            }
+        });
+
+	new Vue({
+	    el: '#app'
+	});
+    </script>
+  </body>
+</html>

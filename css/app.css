@@ -1,0 +1,16 @@
+.pagination {
+  margin: auto;
+  text-align: center;
+}
+
+.favorite {
+  color: gold;
+}
+
+.toast-error {
+  color: red;
+}
+
+.toast-success {
+  color: green;
+}

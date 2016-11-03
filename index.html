@@ -1,0 +1,29 @@
+<html>
+  <head>
+    <title>Index of BlendwebMix VueJs project</title>
+    <link href="/css/materialize.css" rel='stylesheet' type='text/css' />
+  </head>
+  <body class="container">
+    <h1>List of demo</h1>
+    <ul id="pages-block">
+        <li v-for="page in pages">
+            <a v-bind:href="page.url">{{page.name}}</a>
+        </li>
+    </ul>
+    
+    <script data-item="vuejs" src="/js/vue.js"></script>
+    <script data-item="vuejs-index">
+        let listOfPages = new Vue({
+            el: '#pages-block',
+            data: function () {
+                return {
+                    pages: [
+                        {"name": "Components", "url": "index-components.html"},
+                        {"name": "Inline", "url": "index-dom.html"}
+                    ]
+                };
+            }
+        });
+    </script>
+  </body>
+</html>

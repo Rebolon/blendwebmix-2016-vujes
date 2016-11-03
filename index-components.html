@@ -1,0 +1,314 @@
+<html>
+  <head>
+    <title>BlendwebMix VueJs as components</title>
+    <link href="http://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="/css/materialize.css" rel='stylesheet' type='text/css' />
+    <link href="/css/app.css" rel='stylesheet' type='text/css' />
+  </head>
+  <body>
+    <div id="app" class="container">
+        <h1>Marvel Characters</h1>
+        <!-- v-bind to keep the type of variable : Number instead of String -->
+        <characters v-bind:offset=140 v-bind:limit=12></characters>
+
+        <error></error>
+    </div>
+
+    <script data-item="lodash" src="/js/lodash.min.js"></script>
+    <script data-item="vuejs" src="/js/vue.js"></script>
+    <script data-item="vuejs-plugin-resource" src="/js/vue-resource.js"></script>
+    <script data-item="vuejs-plugin-resource" src="/js/api-key.js"></script>
+    <script defer data-item="main">
+        if (typeof window['api-key'] == "undefined") {
+            window.alert("you need to set your api-key in js/api-key.js, a key provided by Marvel API");
+        }
+
+        var Rebolon = {
+            Marvel: {
+                apiKey: window['api-key']
+	    }
+	};
+    </script>
+    <script defer type="x/template" id="characters-tpl">
+        <div>
+            <ul class="collection">
+                <li v-for="character in characters" class="collection-item avatar">
+                    <img v-bind:src="character.thumbnail.path + '.' + character.thumbnail.extension" v-bind:alt="character.name" class="circle">
+                    <span class="title">{{character.name}}</span>
+                    <a href="#!" class="secondary-content" v-bind:class="{favorite: isFavorite(character)}" v-on:click="toggleFavorite(character)"><i class="material-icons">grade</i></a>
+                </li>
+            </ul>
+            
+            <paginator v-bind:total=total v-bind:limit=limit v-bind:offset=current v-bind:pending="pending" v-on:goTo="getCharacters"></paginator>
+        </div>
+    </script>
+    <script defer type="x/template" id="paginator-tpl">
+        <div>
+            <div style="display:block;height:5px;">
+                <div class="progress" v-if="pending">
+                    <div class="indeterminate"></div>
+                </div>
+            </div>
+            <ul class="pagination" v-if="total">
+                <li class="waves-effect"><a href="#!" v-on:click="gotoFirst"><i class="material-icons">first_page</i></a></li>
+                <li class="waves-effect"><a href="#!" v-on:click="gotoPrev"><i class="material-icons">chevron_left</i></a></li>
+                <li class="active"><a href="#!">{{currentPage}}</a></li>
+                <li class="waves-effect"><a href="#!" v-on:click="gotoNext"><i class="material-icons">chevron_right</i></a></li>
+                <li class="waves-effect"><a href="#!" v-on:click="gotoLast"><i class="material-icons">last_page</i></a></li>
+            </ul>
+        </div>
+    </script>
+    <script defer type="x/template" id="error-tpl">
+        <div v-if="error" class="toast-error">{{error}}</div>
+    </script>
+    <script async defer data-item="vuejs-component-characters">
+        /* Bus messaging to allow vue-resource interceptor to communicate with external components */
+        let bus = new Vue();
+        
+        Vue.component('error', {
+            template: '#error-tpl',
+            data: function() {
+                return {
+                    'displayedErrors': [],
+                    'errors': [],
+                    'displayError': false
+                };
+            },
+            computed: {
+                error: function() {
+                    if (this.displayError) return _.last(this.displayedErrors);
+
+                    if (!this.errors.length) return;
+
+                    const error = this.errors.pop();
+                    this.displayedErrors.push(error);
+                    this.displayError = true;
+
+                    setTimeout(() => {this.displayError = false;}, 3000);
+
+                    return error.message;
+                }
+            },
+            created : function() {
+                bus.$on('newError', (error) => {
+                    this.errors.push(error);
+                });
+            }
+        });
+
+         Vue.component('paginator', {
+            template: '#paginator-tpl',
+            props: {
+                'total': {type: Number, default: 0},
+                'limit': {type: Number, default: 0},
+                'offset': {type: Number, default: 0},
+                'pending': {default: false},
+            },
+            computed: {
+                currentPage: function() {
+                    return Math.floor(this.offset / this.limit);
+                }
+            },
+            created: function() {
+              this.getParamsForFirstPage = () => {
+                  const offset = 1;
+
+                  return offset;
+              };
+
+              this.getParamsForPrevPage = () => {
+                  const prev = this.offset-this.limit;
+                  const offset =  prev >= this.getParamsForFirstPage() ? prev : this.getParamsForFirstPage();
+
+                  return offset;
+              };
+
+              this.getParamsForNextPage = () => {
+                  const next = this.offset+this.limit;
+                  const offset = next <= this.getParamsForLastPage() ? next : this.getParamsForLastPage();
+
+                  return offset;
+              };
+
+              this.getParamsForLastPage = () => {
+                  const offset = this.total - this.limit;
+
+                  return offset;
+              };
+            },
+            methods: {
+                "gotoFirst": function() {
+                    const params = {offset: this.getParamsForFirstPage()};
+                    this.$emit("goTo", params);
+                },
+                "gotoLast": function() {
+                    const params = {offset: this.getParamsForLastPage()};
+                    this.$emit("goTo", params);
+                },
+                "gotoPrev": function() {
+                    const params = {offset: this.getParamsForPrevPage()};
+                    this.$emit("goTo", params);
+                },
+                "gotoNext": function() {
+                    const params = {offset: this.getParamsForNextPage()};
+                    this.$emit("goTo", params);
+                }
+            }
+        });
+        
+        Vue.component('characters', {
+            template: '#characters-tpl',
+            props: [
+                'offset',
+                'limit'
+            ],
+            data: function () {
+                return {
+                    characters: {},
+                    total: 0,
+                    lastCallParams: {},
+                    current: this.offset,
+                    pending: undefined
+                };
+            },
+            created: function() {
+                const params = {
+                    offset: this.offset ? parseInt(this.offset) : 0,
+                    limit: this.limit ? parseInt(this.limit) : 10,
+                };
+
+                // init pendingRequest and its subscription
+                bus.$on('newRequest', (request) => {
+                    this.pending = request;
+                });
+                
+                // init Storage
+                this.charactersStorage = {};
+                
+                // get first characters
+                this.getCharacters(params);
+            },
+            methods: {
+                "getCharacters": function(params) {
+                    const filterCharacters = () => {
+                        let characters = _.filter(this.charactersStorage, function(item, index) {
+                            if (index >= params.offset && index < (params.offset + params.limit)) return true;
+                            return false;
+                        });
+
+                        return characters;
+                    }
+                    
+                    // add ApiKey and limit
+                    params.apikey = Rebolon.Marvel.apiKey;
+                    //if (!params.limit) { // @todo to prevent bug, limit should not be mutable, only define at the component creation, if limit is changeable, so charactersStorage index should be recalculated
+                        params.limit = this.limit;
+                    //}
+
+                    // do not update offset coz it's a props, so we should init a watched data and use it to set the paginator props
+                    this.current = params.offset;
+
+                    // cancel previous request if exists
+                    if (this.pending) {
+                        console.info('a request is already running');
+                        this.pending.abort();
+                    }
+
+                    // use charactersStorage if exists and prevent http call
+                    if (this.charactersStorage[params.offset]) {
+                        this.characters = filterCharacters();
+
+                        return;
+                    }
+
+                    this.$http
+                    .get("https://gateway.marvel.com:443/v1/public/characters", {params: params})
+                    .then(response => {
+                        try {
+                            const characters = response.body.data.results;
+                            let favorites = this.getFavorites();
+
+                            if (this.total !== response.body.data.total) {
+                                this.total = response.body.data.total;
+                            }
+
+                            /* @todo prefer this method to prevent useless call to Marvel API */
+                            let index = params.offset;
+                            characters.forEach(character => {
+                                character.favorite = false;
+
+                                // for the reactivity of the template
+                                if (-1 !== _.findIndex(favorites, (id) => {
+                                            return character.id === id
+                                        })
+                                ) {
+                                    character.favorite = true;
+                                }
+
+                                this.charactersStorage[index] = (character);
+                                index++;
+                            });
+
+                            this.characters = filterCharacters();
+                        } catch (e) {
+                            console.error('unexpected data', response);
+                        }
+                    }, response => {
+                        console.warn('http error', response);
+                    })
+                    .then(() => {
+                        this.pending = undefined;
+                    });
+                },
+                "isFavorite": function(character) {
+                    return character.favorite;
+                },
+                "toggleFavorite": function(character) {
+                    let favorites = this.getFavorites();
+
+                    if (favorites.length > 5) {
+                        bus.$emit('newError', {"message": "You already have 5 favorites, you can't get more"});
+                        return;
+                    }
+
+                    favorites.push(character.id);
+                    this.setFavorites(favorites);
+
+                    // for the reactivity
+                    character.favorite = true;
+
+                    return;
+                },
+                "getFavorites": function() {
+                    let rawFavorites = localStorage.getItem('favorites');
+
+                    if (rawFavorites) {
+                        let favorites = JSON.parse(rawFavorites);
+                        if (typeof favorites == "object" && favorites.length !== "undefined") {
+                            return favorites;
+                        }
+                    }
+
+                    return [];
+                },
+                "setFavorites": function(favorites) {
+                    if (typeof favorites == "object" && favorites.length !== "undefined") {
+                        localStorage.setItem('favorites', JSON.stringify(favorites));
+                    }
+                }
+            }
+        });
+
+        Vue.http.interceptors.push((request, next) => {
+            bus.$emit('newRequest', request);
+            
+            // continue to next interceptor
+            next();
+        });
+        
+        new Vue({
+            el: '#app'
+        });
+    </script>
+  </body>
+</html>
