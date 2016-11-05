@@ -8,11 +8,22 @@
     <ul id="pages-block">
         <li v-for="page in pages">
             <a v-bind:href="page.url">{{page.name}}</a>
+            <debug :item="page"/>
         </li>
     </ul>
     
     <script data-item="vuejs" src="/js/vue.js"></script>
     <script data-item="vuejs-index">
+        Vue.component('debug', {
+            template: "<!-- debug -->",
+            props: [
+                    "item"
+            ],
+            created: function() {
+                console.log("debug", this.item.name);
+            }
+        });
+
         let listOfPages = new Vue({
             el: '#pages-block',
             data: function () {
